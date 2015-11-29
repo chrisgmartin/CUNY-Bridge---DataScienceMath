@@ -1,0 +1,232 @@
+---
+title: "CUNY Data Science Math Bridge - Final"
+output: html_document
+---
+
+Your Data Science Math final is due by the end of day on Sunday, 29 November. You should post your solutions to your GitHub account. You are also expected to make a short presentation during our last meeting (3-5 minutes). This project will show off your ability to understand probability, statistics, linear algebra, and R.
+
+Using the hflights package or another large (greater than 100,000 observations and 20 variables) dataset of your choosing, pick two quantitative variables (e.g., Arrival Delay and Departure Delay). Define one of these variables as the random variable X and the other as the random variable Y. One of these variables must be skewed to the right (positively)
+
+
+
+
+Load *hflights* and select two quantitative variables: **AirTime = X** and **Distance = Y**
+```{r}
+require(hflights)
+require(ggplot2)
+require(MASS)
+```
+
+
+Check skew
+```{r}
+summary(hflights$AirTime)
+summary(hflights$Distance)
+```
+
+Remove NA's
+```{r}
+hflights2 <- subset(hflights, !(is.na(hflights$AirTime) | is.na(hflights$Distance)))
+summary(hflights$AirTime)
+summary(hflights$Distance)
+```
+
+Create new table with only necessary varibles and take the log of both columns to standardize the distributions
+```{r}
+hflights3 <- hflights2[11]
+hflights4 <- hflights2[16]
+hflights2 <- cbind(hflights3, hflights4)
+rm(hflights3)
+rm(hflights4)
+lflights <- log(hflights2)
+summary(lflights)
+#Test correlation at 95% confidence level
+cor.test(lflights$AirTime,lflights$Distance)
+```
+As expected, there is a high correlation between the two which makes sense seeing as longer distance flights should take more time, and more flight time should take planes a futher distance.
+
+**QUESTION ONE**
+*Probability.* Calculate as a minimum the below probabilities *a* through *d*. Assume the small letter "x" is estimated as the 3d quartile of the X variable, and the small letter "y" is estimated as the 2d quartile of the Y variable. Interpret the meaning of all probabilities. In addition, make a table of counts as shown below.
+
+- a. P(X>x | Y>y)
+- b. P(X>x, Y>y)
+- c. P(X<x | Y>y)
+- d. P(X<x | Y<y)
+
+```{r}
+meanX <- mean(lflights$AirTime)
+meanY <- mean(lflights$Distance)
+sdX <- sd(lflights$AirTime)
+sdY <- sd(lflights$Distance)
+x <- as.numeric(quantile(lflights$AirTime, .75))
+y <- as.numeric(median(lflights$Distance))
+x
+y
+#a. P(X>x | Y>y)
+((1-pnorm(y,mean=meanY,sd=sdY)) * (1-pnorm(x,mean=meanX, sd=sdX))) / (1-pnorm(y,mean=meanY,sd=sdY))
+
+#b. P(X>x, Y>y)
+(1-pnorm(y,mean=meanY,sd=sdY)) * (1- pnorm(x,mean=meanX, sd=sdX))
+
+#c. P(X<x | Y>y)
+((1-pnorm(y,mean=meanY,sd=sdY)) * pnorm(x,mean=meanX, sd=sdX))/(1-pnorm(y,mean=meanY,sd=sdY))
+
+
+#d. P(X<x | Y<y)
+(pnorm(y,mean=meanY,sd=sdY) * pnorm(x,mean=meanX, sd=sdX))/pnorm(y,mean=meanY,sd=sdY)
+```
+
+
+*Interpreation* These figures look reasonable at first glance given the highly skewed distributions.
+
+- a. P(X>x | Y>y):23.3% Probability that, given a flight distance greater than 809 miles (the median), a flight will be longer than 141 mins. (3rd quartile)
+- b. P(X>x, Y>y): There is an 8.65% probability that a flight will be longer than 809 miles and longer than 141 mins.
+- c. P(X<x | Y>y): There is a 71.94% probability that a flight will be less than 809 miles given a flight is longer than 141 mins.
+- d. P(X<x | Y<y): There is a 71.94% probability that a flight will be less than 809 miles given a flight is less than 141 mins.
+
+*Table to Complete*s
+
+- ONEA (<=3d quartile, <=2d quartile)
+- ONEB (<=3d quartile, >2d quartile)
+- ONEC (>3d quartile, <=2d quartile)
+- ONED (>3d quartile, >2d quartile)
+- ONEE Total: (x, <=2d quartile)
+- ONEF Total: (x, >2d quartile)
+- ONEG Total: (<=3d quartile, y)
+- ONEH Total: (>3d quartile, y)
+- ONEI Total:
+
+```{r}
+ONEA <- pnorm(x, mean=meanX, sd=sdX, lower.tail=TRUE) * pnorm(y, mean=meanY, sd=sdY, lower.tail=TRUE)
+ONEA
+ONEB <- pnorm(x, mean=meanX, sd=sdX, lower.tail=TRUE) * pnorm(y, mean=meanY, sd=sdY, lower.tail=FALSE)
+ONEB
+ONEC <- pnorm(x, mean=meanX, sd=sdX, lower.tail=FALSE) * pnorm(y, mean=meanY, sd=sdY, lower.tail=TRUE)
+ONEC
+ONED <- pnorm(x, mean=meanX, sd=sdX, lower.tail=FALSE) * pnorm(y, mean=meanY, sd=sdY, lower.tail=FALSE)
+ONED
+ONEE <- sum(c(ONEA, ONEC))
+ONEE
+ONEF <- sum(c(ONEB, ONED))
+ONEF
+ONEG <- sum(c(ONEA, ONEB))
+ONEG
+ONEH <- sum(c(ONEC, ONED))
+ONEH
+ONEI <- sum(c(ONEG,ONEH))
+ONEI
+matrix1 <- matrix(c(ONEA, ONEC, ONEE, ONEB, ONED, ONEF, ONEG, ONEH, ONEI),3,3)
+matrix1
+```
+
+
+Does splitting the data in this fashion make them independent? Let A be the new variable counting those observations above the 3d quartile for X, and let B be the new variable counting those observations for the 2d quartile for Y. Does P(A|B)=P(A)P(B)? Check mathematically, and then evaluate by running a Chi Square test for association.
+
+*ANSWER 1* The variables are not independent, they are dependent by their nature and highly correlated. The table falsely gives the impression of indepence.
+
+```{r}
+PAgivenB <- ((1-pnorm(y,mean=meanY,sd=sdY)) * (1- pnorm(x,mean=meanX, sd=sdX)))/(1-pnorm(y,mean=meanY,sd=sdY))
+PAandB <- ((1-pnorm(y,mean=meanY,sd=sdY)) * (1- pnorm(x,mean=meanX, sd=sdX)))
+PAgivenB
+PAandB
+PAgivenB = PAandB
+```
+
+*ANSWER 2*  The two are not equal.
+
+```{r}
+dofree <- (2-1) * (length(lflights$AirTime)-1)
+dofree
+qchisq(0.95,dofree)
+chisq.test(lflights)
+```
+
+*ANSWER 3* We reject the null since he calculated value of the test statistic is greater than the critical value; therefore we reject the null that Distance and Air Time are independent.
+
+
+
+**QUESTION TWO**
+*Descriptive and Inferential Statistics.* Provide univariate descriptive statistics and appropriate plots. Provide a scatterplot of the two variables. Provide a 95% CI for the difference in the mean of the variables. Derive a correlation matrix for two of the quantitative variables you selected. Test the hypothesis that the correlation between these variables is 0 and provide a 99% confidence interval. Discuss the meaning of your analysis.
+```{r}
+summary(lflights$AirTime)
+sd(lflights$AirTime)
+length(lflights$AirTime)
+hist(lflights$AirTime)
+summary(lflights$Distance)
+sd(lflights$Distance)
+length(lflights$Distance)
+hist(lflights$Distance)
+ggplot(lflights, aes(x=lflights$Distance, y=lflights$AirTime)) + geom_point()
+```
+
+*ANSWER 1* The statistics and plots above are univariate descriptive statistics and plots of the two variables: Air Time and Distance.
+
+```{r}
+#95% CI for diff in mean
+t.test(lflights$AirTime,lflights$Distance,paired=TRUE)
+hflightdiff <- lflights$AirTime - lflights$Distance
+ggplot(lflights, aes(x=AirTime - Distance)) + geom_density() + geom_vline(xintercept = mean(hflightdiff))
+```
+
+*ANSWER 2* We created a 95% CI for the difference in the mean of the variables.
+
+```{r}
+#Create a correlation matrix
+corrmat <- cor(lflights)
+corrmat
+```
+
+*ANSWER 3* The matrix above displays the correlation matrix for the two variables.
+
+```{r}
+#Test the hypothesis that the correlation between these variables is 0 and provide 99% confidence interval
+cor.test(x=lflights$AirTime,y=lflights$Distance,conf.level = .99)
+```
+
+*ANSWER 4* We reject the null hypothesis that the correlation at a 99% confidence interval is 0.
+
+
+
+**QUESTION THREE**
+*Linear Algebra and Correlation.* Invert your correlation matrix. (This is known as the precision matrix and contains variance inflation factors on the diagonal.) Multiply the correlation matrix by the precision matrix, and then multiply the precision matrix by the correlation matrix. As an advanced option, conduct principle components analysis and interpret. Discuss.
+```{r}
+precismat <- solve(corrmat)
+precismat
+#Check if inverse is correctly calculated
+solve(corrmat) %*% corrmat == diag(nrow = nrow(corrmat), ncol = ncol(corrmat))
+#Multiply correlation matrix and its' inverse
+precismat %*% corrmat
+corrmat %*% precismat
+```
+
+*ANSWER 1* 
+Using the solve() function, the correlation matrix is first inverted and checked, and then it can be multiplied with itself. The correlation matrix and its inverse, multiplied together in both ways, correctly return a diagional 1 matrix.
+
+
+
+**QUESTION FOUR**
+*Calculus-Based Probability & Statistics.* Many times, it makes sense to fit a closed form distribution to data. For your variable that is skewed to the right, shift it so that the minimum value is above zero. Then load the MASS package and run fitdistr to fit an exponential probability density function. (See https://stat.ethz.ch/R-manual/R-devel/library/MASS/html/fitdistr.html). Find the optimal value of lamda for this distribution, and then take 1000 samples from this exponential distribution using this value (e.g., rexp(1000,lamda)). Plot a histogram and compare it with a histogram of your original variable. Using the exponential pdf, find the 5th and 95th percentiles using the cumulative distribution function (CDF). Also generate a 95% confidence interval from the empirical data, assuming normality. Finally, provide the empirical 5th percentile and 95th percentile of the data. Discuss.
+```{r}
+fdist <- fitdistr(lflights$AirTime, densfun = ("exponential"))
+lambda <- 1 / fdist$sd
+samp <- c(rexp(1000,lambda))
+hist(samp)
+hist(lflights$Distance)
+```
+
+*ANSWER 1*
+Histograms for the fit distribution and original. Fit distribution
+
+```{r}
+summary(samp)
+quantile(samp, c(.05,.95))
+mean(samp)
+stderror <- sd(samp)/sqrt(1000)
+stderror
+FOURone1 <- mean(samp) + 1.96 * stderror
+FOURone2 <- mean(samp) - 1.96 * stderror
+c(FOURone1,FOURone2)
+```
+
+*ANSWER 2*
+The 5th and 95th percentiles with the 95% confidence interval
